@@ -46,6 +46,12 @@ import android.location.Location;
 import androidx.annotation.RequiresApi;
 import androidx.exifinterface.media.ExifInterface;
 
+import com.awxkee.jxlcoder.JxlCoder;
+import com.awxkee.jxlcoder.JxlChannelsConfiguration;
+import com.awxkee.jxlcoder.JxlCompressionOption;
+import com.awxkee.jxlcoder.JxlEffort;
+import com.awxkee.jxlcoder.JxlDecodingSpeed;
+
 import android.media.MediaCodec;
 import android.media.MediaCodecInfo;
 import android.media.MediaCodecList;
@@ -156,7 +162,8 @@ public class ImageSaver extends Thread {
         enum ImageFormat {
             STD, // leave unchanged from the standard JPEG format
             WEBP,
-            PNG
+            PNG,
+            JXL
         }
         ImageFormat image_format;
         int image_quality;
@@ -3027,6 +3034,9 @@ public class ImageSaver extends Thread {
             case PNG:
                 extension = "png";
                 break;
+            case JXL:
+                extension = "jxl";
+                break;
             default:
                 extension = "jpg";
                 break;
@@ -3180,8 +3190,14 @@ public class ImageSaver extends Thread {
                     if( bitmap != null ) {
                         if( MyDebug.LOG )
                             Log.d(TAG, "compress bitmap, quality " + request.image_quality);
-                        Bitmap.CompressFormat compress_format = getBitmapCompressFormat(request.image_format);
-                        bitmap.compress(compress_format, request.image_quality, outputStream);
+                        if( request.image_format == Request.ImageFormat.JXL ) {
+                            byte[] jxlBytes = JxlCoder.INSTANCE.encode(bitmap, JxlChannelsConfiguration.RGB, JxlCompressionOption.LOSSY, JxlEffort.TORTOISE, request.image_quality, JxlDecodingSpeed.SLOWEST);
+                            outputStream.write(jxlBytes);
+                        }
+                        else {
+                            Bitmap.CompressFormat compress_format = getBitmapCompressFormat(request.image_format);
+                            bitmap.compress(compress_format, request.image_quality, outputStream);
+                        }
                     }
                     else {
                         outputStream.write(data);

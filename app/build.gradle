@@ -2,6 +2,7 @@ apply plugin: 'com.android.application'
 
 android {
     compileSdk 35
+    buildToolsVersion "35.0.0"
     compileOptions.encoding = 'UTF-8'
 
     defaultConfig {
@@ -53,6 +54,9 @@ dependencies {
     implementation 'androidx.exifinterface:exifinterface:1.4.1'
 
     testImplementation 'junit:junit:4.13.2'
+
+    // JXL
+    implementation 'io.github.awxkee:jxl-coder:2.2.0'
 
     // newer AndroidJUnit4 InstrumentedTest
     androidTestImplementation "androidx.test:runner:1.7.0"

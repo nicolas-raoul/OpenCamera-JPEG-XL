@@ -860,22 +860,26 @@
         <item>@string/preference_image_format_jpeg_r</item>
         <item>@string/preference_image_format_webp</item>
         <item>@string/preference_image_format_png</item>
+        <item>@string/preference_image_format_jxl</item>
     </string-array>
     <string-array name="preference_image_format_values">
         <item>preference_image_format_jpeg</item>
         <item>preference_image_format_jpeg_r</item>
         <item>preference_image_format_webp</item>
         <item>preference_image_format_png</item>
+        <item>preference_image_format_jxl</item>
     </string-array>
     <string-array name="preference_image_format_entries_nojpegr">
         <item>@string/preference_image_format_jpeg</item>
         <item>@string/preference_image_format_webp</item>
         <item>@string/preference_image_format_png</item>
+        <item>@string/preference_image_format_jxl</item>
     </string-array>
     <string-array name="preference_image_format_values_nojpegr">
         <item>preference_image_format_jpeg</item>
         <item>preference_image_format_webp</item>
         <item>preference_image_format_png</item>
+        <item>preference_image_format_jxl</item>
     </string-array>
     <string-array name="preference_nr_mode_entries">
         <item>@string/preference_nr_mode_normal</item>

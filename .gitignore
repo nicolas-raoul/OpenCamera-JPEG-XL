@@ -24,3 +24,11 @@ testdata/
 
 local.properties
 uninstall.bat
+
+# JXL Testing
+testing/
+*.log
+logs.txt
+captured.jxl
+screenshot*.png
+
