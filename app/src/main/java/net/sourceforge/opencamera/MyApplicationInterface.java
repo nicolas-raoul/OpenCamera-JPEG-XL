@@ -1790,8 +1790,10 @@ public class MyApplicationInterface extends BasicApplicationInterface {
                 return ImageSaver.Request.ImageFormat.WEBP;
             case "preference_image_format_png":
                 return ImageSaver.Request.ImageFormat.PNG;
-            case "preference_image_format_jxl":
-                return ImageSaver.Request.ImageFormat.JXL;
+            case "preference_image_format_jxl_fast":
+                return ImageSaver.Request.ImageFormat.JXL_FAST;
+            case "preference_image_format_jxl_high_comp":
+                return ImageSaver.Request.ImageFormat.JXL_HIGH_COMPRESSION;
             default:
                 return ImageSaver.Request.ImageFormat.STD;
         }

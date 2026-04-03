@@ -163,7 +163,8 @@ public class ImageSaver extends Thread {
             STD, // leave unchanged from the standard JPEG format
             WEBP,
             PNG,
-            JXL
+            JXL_FAST,
+            JXL_HIGH_COMPRESSION
         }
         ImageFormat image_format;
         int image_quality;
@@ -3034,7 +3035,8 @@ public class ImageSaver extends Thread {
             case PNG:
                 extension = "png";
                 break;
-            case JXL:
+            case JXL_FAST:
+            case JXL_HIGH_COMPRESSION:
                 extension = "jxl";
                 break;
             default:
@@ -3190,8 +3192,10 @@ public class ImageSaver extends Thread {
                     if( bitmap != null ) {
                         if( MyDebug.LOG )
                             Log.d(TAG, "compress bitmap, quality " + request.image_quality);
-                        if( request.image_format == Request.ImageFormat.JXL ) {
-                            byte[] jxlBytes = JxlCoder.INSTANCE.encode(bitmap, JxlChannelsConfiguration.RGB, JxlCompressionOption.LOSSY, JxlEffort.TORTOISE, request.image_quality, JxlDecodingSpeed.SLOWEST);
+                        if( request.image_format == Request.ImageFormat.JXL_FAST || request.image_format == Request.ImageFormat.JXL_HIGH_COMPRESSION ) {
+                            JxlEffort effort = request.image_format == Request.ImageFormat.JXL_FAST ? JxlEffort.FALCON : JxlEffort.TORTOISE;
+                            JxlDecodingSpeed speed = request.image_format == Request.ImageFormat.JXL_FAST ? JxlDecodingSpeed.FAST : JxlDecodingSpeed.SLOWEST;
+                            byte[] jxlBytes = JxlCoder.INSTANCE.encode(bitmap, JxlChannelsConfiguration.RGB, JxlCompressionOption.LOSSY, effort, request.image_quality, speed);
                             outputStream.write(jxlBytes);
                         }
                         else {
