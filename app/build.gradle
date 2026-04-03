@@ -56,9 +56,9 @@ dependencies {
     testImplementation 'junit:junit:4.13.2'
 
     // JXL
-    implementation 'io.github.awxkee:jxl-coder:2.2.0'
+    implementation 'io.github.awxkee:jxl-coder:2.6.0'
     // AVIF
-    implementation 'com.github.awxkee:avif-coder:1.5.8'
+    implementation 'io.github.awxkee:avif-coder:2.2.0'
 
     // newer AndroidJUnit4 InstrumentedTest
     androidTestImplementation "androidx.test:runner:1.7.0"
