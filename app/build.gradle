@@ -7,7 +7,7 @@ android {
 
     defaultConfig {
         applicationId "net.sourceforge.opencamera"
-        minSdkVersion 21
+        minSdkVersion 24
         targetSdkVersion 35
         //compileSdkVersion 31 // needed to support appcompat:1.4.0 (which we need for emoji policy support, and not yet ready to target SDK 30)
 
@@ -57,6 +57,8 @@ dependencies {
 
     // JXL
     implementation 'io.github.awxkee:jxl-coder:2.2.0'
+    // AVIF
+    implementation 'com.github.awxkee:avif-coder:1.5.8'
 
     // newer AndroidJUnit4 InstrumentedTest
     androidTestImplementation "androidx.test:runner:1.7.0"

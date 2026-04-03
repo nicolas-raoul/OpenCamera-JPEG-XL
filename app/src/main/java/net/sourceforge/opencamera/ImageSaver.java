@@ -51,6 +51,7 @@ import com.awxkee.jxlcoder.JxlChannelsConfiguration;
 import com.awxkee.jxlcoder.JxlCompressionOption;
 import com.awxkee.jxlcoder.JxlEffort;
 import com.awxkee.jxlcoder.JxlDecodingSpeed;
+import com.radzivon.bartoshyk.avif.coder.HeifCoder;
 
 import android.media.MediaCodec;
 import android.media.MediaCodecInfo;
@@ -164,7 +165,9 @@ public class ImageSaver extends Thread {
             WEBP,
             PNG,
             JXL_FAST,
-            JXL_HIGH_COMPRESSION
+            JXL_HIGH_COMPRESSION,
+            AVIF_FAST,
+            AVIF_HIGH_COMPRESSION
         }
         ImageFormat image_format;
         int image_quality;
@@ -3039,6 +3042,10 @@ public class ImageSaver extends Thread {
             case JXL_HIGH_COMPRESSION:
                 extension = "jxl";
                 break;
+            case AVIF_FAST:
+            case AVIF_HIGH_COMPRESSION:
+                extension = "avif";
+                break;
             default:
                 extension = "jpg";
                 break;
@@ -3197,6 +3204,10 @@ public class ImageSaver extends Thread {
                             JxlDecodingSpeed speed = request.image_format == Request.ImageFormat.JXL_FAST ? JxlDecodingSpeed.FAST : JxlDecodingSpeed.SLOWEST;
                             byte[] jxlBytes = JxlCoder.INSTANCE.encode(bitmap, JxlChannelsConfiguration.RGB, JxlCompressionOption.LOSSY, effort, request.image_quality, speed);
                             outputStream.write(jxlBytes);
+                        }
+                        else if( request.image_format == Request.ImageFormat.AVIF_FAST || request.image_format == Request.ImageFormat.AVIF_HIGH_COMPRESSION ) {
+                            byte[] avifBytes = new HeifCoder().encodeAvif(bitmap, request.image_quality);
+                            outputStream.write(avifBytes);
                         }
                         else {
                             Bitmap.CompressFormat compress_format = getBitmapCompressFormat(request.image_format);
