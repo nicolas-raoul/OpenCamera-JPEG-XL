@@ -1794,10 +1794,10 @@ public class MyApplicationInterface extends BasicApplicationInterface {
                 return ImageSaver.Request.ImageFormat.JXL_FAST;
             case "preference_image_format_jxl_high_comp":
                 return ImageSaver.Request.ImageFormat.JXL_HIGH_COMPRESSION;
-            case "preference_image_format_avif_fast":
-                return ImageSaver.Request.ImageFormat.AVIF_FAST;
-            case "preference_image_format_avif_high_comp":
-                return ImageSaver.Request.ImageFormat.AVIF_HIGH_COMPRESSION;
+            case "preference_image_format_avif":
+                return ImageSaver.Request.ImageFormat.AVIF;
+            case "preference_image_format_heic":
+                return ImageSaver.Request.ImageFormat.HEIC;
             default:
                 return ImageSaver.Request.ImageFormat.STD;
         }

@@ -858,6 +858,9 @@ public class StorageUtils {
             case "avif":
                 mimeType = "image/avif";
                 break;
+            case "heic":
+                mimeType = "image/heic";
+                break;
             default:
                 mimeType = "image/jpeg";
                 break;

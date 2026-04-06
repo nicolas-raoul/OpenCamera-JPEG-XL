@@ -51,7 +51,6 @@ import com.awxkee.jxlcoder.JxlChannelsConfiguration;
 import com.awxkee.jxlcoder.JxlCompressionOption;
 import com.awxkee.jxlcoder.JxlEffort;
 import com.awxkee.jxlcoder.JxlDecodingSpeed;
-import com.radzivon.bartoshyk.avif.coder.HeifCoder;
 
 import android.media.MediaCodec;
 import android.media.MediaCodecInfo;
@@ -166,8 +165,8 @@ public class ImageSaver extends Thread {
             PNG,
             JXL_FAST,
             JXL_HIGH_COMPRESSION,
-            AVIF_FAST,
-            AVIF_HIGH_COMPRESSION
+            AVIF,
+            HEIC
         }
         ImageFormat image_format;
         int image_quality;
@@ -3042,9 +3041,11 @@ public class ImageSaver extends Thread {
             case JXL_HIGH_COMPRESSION:
                 extension = "jxl";
                 break;
-            case AVIF_FAST:
-            case AVIF_HIGH_COMPRESSION:
+            case AVIF:
                 extension = "avif";
+                break;
+            case HEIC:
+                extension = "heic";
                 break;
             default:
                 extension = "jpg";
@@ -3136,41 +3137,57 @@ public class ImageSaver extends Thread {
                 if( MyDebug.LOG )
                     Log.d(TAG, "use media store");
                 use_media_store = true;
+                boolean use_files_uri = Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q && "jxl".equals(extension);
                 Uri folder = Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q ?
-                        MediaStore.Images.Media.getContentUri(MediaStore.VOLUME_EXTERNAL_PRIMARY) :
+                        (use_files_uri ? MediaStore.Files.getContentUri(MediaStore.VOLUME_EXTERNAL_PRIMARY) : MediaStore.Images.Media.getContentUri(MediaStore.VOLUME_EXTERNAL_PRIMARY)) :
                         MediaStore.Images.Media.EXTERNAL_CONTENT_URI;
                 contentValues = new ContentValues();
                 String picName = storageUtils.createMediaFilename(StorageUtils.MEDIA_TYPE_IMAGE, filename_suffix, 0, "." + extension, request.current_date);
                 if( MyDebug.LOG )
                     Log.d(TAG, "picName: " + picName);
-                contentValues.put(MediaStore.Images.Media.DISPLAY_NAME, picName);
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q && use_files_uri) {
+                    contentValues.put(MediaStore.MediaColumns.DISPLAY_NAME, picName);
+                } else {
+                    contentValues.put(MediaStore.Images.Media.DISPLAY_NAME, picName);
+                }
                 String mime_type = storageUtils.getImageMimeType(extension);
                 if( MyDebug.LOG )
                     Log.d(TAG, "mime_type: " + mime_type);
-                contentValues.put(MediaStore.Images.Media.MIME_TYPE, mime_type);
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q && use_files_uri) {
+                    contentValues.put(MediaStore.MediaColumns.MIME_TYPE, "application/octet-stream");
+                } else {
+                    contentValues.put(MediaStore.Images.Media.MIME_TYPE, mime_type);
+                }
                 if( Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q ) {
                     String relative_path = storageUtils.getSaveRelativeFolder();
+                    if (use_files_uri) {
+                        if (relative_path.startsWith("DCIM/")) {
+                            relative_path = "Download/" + relative_path.substring(5);
+                        } else if (relative_path.startsWith("Pictures/")) {
+                            relative_path = "Download/" + relative_path.substring(9);
+                        } else if (!relative_path.startsWith("Download/")) {
+                            relative_path = "Download/OpenCamera";
+                        }
+                    }
                     if( MyDebug.LOG )
                         Log.d(TAG, "relative_path: " + relative_path);
-                    contentValues.put(MediaStore.Images.Media.RELATIVE_PATH, relative_path);
-                    contentValues.put(MediaStore.Images.Media.IS_PENDING, 1);
+                    if (use_files_uri) {
+                        contentValues.put(MediaStore.MediaColumns.RELATIVE_PATH, relative_path);
+                        contentValues.put(MediaStore.MediaColumns.IS_PENDING, 1);
+                    } else {
+                        contentValues.put(MediaStore.Images.Media.RELATIVE_PATH, relative_path);
+                        contentValues.put(MediaStore.Images.Media.IS_PENDING, 1);
+                    }
                 }
 
-                // Note, we catch exceptions specific to insert() here and rethrow as IOException,
-                // rather than catching below, to avoid catching things too broadly - e.g.,
-                // IllegalStateException can also be thrown via "new Canvas" (from
-                // postProcessBitmap()) but this is a programming error that we shouldn't catch.
-                // Catching too broadly could mean we miss genuine problems that should be fixed.
                 try {
                     saveUri = main_activity.getContentResolver().insert(folder, contentValues);
                 }
                 catch(IllegalArgumentException e) {
-                    // can happen for mediastore method if invalid ContentResolver.insert() call
                     MyDebug.logStackTrace(TAG, "IllegalArgumentException inserting to mediastore", e);
                     throw new IOException();
                 }
                 catch(IllegalStateException e) {
-                    // have received Google Play crashes from ContentResolver.insert() call for mediastore method
                     MyDebug.logStackTrace(TAG, "IllegalStateException inserting to mediastore", e);
                     throw new IOException();
                 }
@@ -3180,7 +3197,8 @@ public class ImageSaver extends Thread {
                     throw new IOException();
                 }
             }
-            else {
+
+            if( saveUri == null ) {
                 picFile = storageUtils.createOutputMediaFile(StorageUtils.MEDIA_TYPE_IMAGE, filename_suffix, extension, request.current_date);
                 if( MyDebug.LOG )
                     Log.d(TAG, "save to: " + picFile.getAbsolutePath());
@@ -3190,12 +3208,17 @@ public class ImageSaver extends Thread {
                 Log.d(TAG, "saveUri: " + saveUri);
 
             if( picFile != null || saveUri != null ) {
-                OutputStream outputStream;
-                if( picFile != null )
-                    outputStream = new FileOutputStream(picFile);
-                else
-                    outputStream = main_activity.getContentResolver().openOutputStream(saveUri);
+                boolean use_heif_writer = request.image_format == Request.ImageFormat.AVIF || request.image_format == Request.ImageFormat.HEIC;
+                OutputStream outputStream = null;
+                
                 try {
+                    if (!use_heif_writer) {
+                        if( picFile != null )
+                            outputStream = new FileOutputStream(picFile);
+                        else
+                            outputStream = main_activity.getContentResolver().openOutputStream(saveUri);
+                    }
+                    
                     if( bitmap != null ) {
                         if( MyDebug.LOG )
                             Log.d(TAG, "compress bitmap, quality " + request.image_quality);
@@ -3205,9 +3228,45 @@ public class ImageSaver extends Thread {
                             byte[] jxlBytes = JxlCoder.INSTANCE.encode(bitmap, JxlChannelsConfiguration.RGB, JxlCompressionOption.LOSSY, effort, request.image_quality, speed);
                             outputStream.write(jxlBytes);
                         }
-                        else if( request.image_format == Request.ImageFormat.AVIF_FAST || request.image_format == Request.ImageFormat.AVIF_HIGH_COMPRESSION ) {
-                            byte[] avifBytes = new HeifCoder().encodeAvif(bitmap, request.image_quality);
-                            outputStream.write(avifBytes);
+                        else if( use_heif_writer ) {
+                            try {
+                                if (picFile != null) {
+                                    if (request.image_format == Request.ImageFormat.AVIF) {
+                                        androidx.heifwriter.AvifWriter heifWriter = new androidx.heifwriter.AvifWriter.Builder(picFile.getAbsolutePath(), bitmap.getWidth(), bitmap.getHeight(), androidx.heifwriter.AvifWriter.INPUT_MODE_BITMAP).setQuality(request.image_quality).build();
+                                        heifWriter.start();
+                                        heifWriter.addBitmap(bitmap);
+                                        heifWriter.stop(3000);
+                                        heifWriter.close();
+                                    } else {
+                                        androidx.heifwriter.HeifWriter heifWriter = new androidx.heifwriter.HeifWriter.Builder(picFile.getAbsolutePath(), bitmap.getWidth(), bitmap.getHeight(), androidx.heifwriter.HeifWriter.INPUT_MODE_BITMAP).setQuality(request.image_quality).build();
+                                        heifWriter.start();
+                                        heifWriter.addBitmap(bitmap);
+                                        heifWriter.stop(3000);
+                                        heifWriter.close();
+                                    }
+                                } else if (saveUri != null) {
+                                    android.os.ParcelFileDescriptor pfd = main_activity.getContentResolver().openFileDescriptor(saveUri, "rw");
+                                    try {
+                                        if (request.image_format == Request.ImageFormat.AVIF) {
+                                            androidx.heifwriter.AvifWriter heifWriter = new androidx.heifwriter.AvifWriter.Builder(pfd.getFileDescriptor(), bitmap.getWidth(), bitmap.getHeight(), androidx.heifwriter.AvifWriter.INPUT_MODE_BITMAP).setQuality(request.image_quality).build();
+                                            heifWriter.start();
+                                            heifWriter.addBitmap(bitmap);
+                                            heifWriter.stop(3000);
+                                            heifWriter.close();
+                                        } else {
+                                            androidx.heifwriter.HeifWriter heifWriter = new androidx.heifwriter.HeifWriter.Builder(pfd.getFileDescriptor(), bitmap.getWidth(), bitmap.getHeight(), androidx.heifwriter.HeifWriter.INPUT_MODE_BITMAP).setQuality(request.image_quality).build();
+                                            heifWriter.start();
+                                            heifWriter.addBitmap(bitmap);
+                                            heifWriter.stop(3000);
+                                            heifWriter.close();
+                                        }
+                                    } finally {
+                                        pfd.close();
+                                    }
+                                }
+                            } catch (Exception e) {
+                                e.printStackTrace();
+                            }
                         }
                         else {
                             Bitmap.CompressFormat compress_format = getBitmapCompressFormat(request.image_format);
@@ -3215,11 +3274,15 @@ public class ImageSaver extends Thread {
                         }
                     }
                     else {
-                        outputStream.write(data);
+                        if (outputStream != null) {
+                            outputStream.write(data);
+                        }
                     }
                 }
                 finally {
-                    outputStream.close();
+                    if (outputStream != null) {
+                        outputStream.close();
+                    }
                 }
                 if( MyDebug.LOG )
                     Log.d(TAG, "saveImageNow saved photo");
@@ -3279,6 +3342,12 @@ public class ImageSaver extends Thread {
                 boolean hasnoexifdatetime = request.remove_device_exif != Request.RemoveDeviceExif.OFF && request.remove_device_exif != Request.RemoveDeviceExif.KEEP_DATETIME;
 
                 if( picFile != null && saveUri == null ) {
+                    if ("jxl".equals(extension) && picFile.getName().endsWith(".jpg")) {
+                        java.io.File newFile = new java.io.File(picFile.getAbsolutePath().substring(0, picFile.getAbsolutePath().length() - 4));
+                        if (picFile.renameTo(newFile)) {
+                            picFile = newFile;
+                        }
+                    }
                     // broadcast for SAF is done later, when we've actually written out the file
                     storageUtils.broadcastFile(picFile, true, false, update_thumbnail, hasnoexifdatetime, null);
                     main_activity.test_last_saved_image = picFile.getAbsolutePath();
@@ -3298,6 +3367,20 @@ public class ImageSaver extends Thread {
                         if( Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q ) {
                             contentValues.clear();
                             contentValues.put(MediaStore.Images.Media.IS_PENDING, 0);
+                            if ("jxl".equals(extension)) {
+                                try {
+                                    android.database.Cursor c = main_activity.getContentResolver().query(saveUri, new String[]{MediaStore.Images.Media.DISPLAY_NAME}, null, null, null);
+                                    if (c != null && c.moveToFirst()) {
+                                        String name = c.getString(0);
+                                        if (name != null && name.toLowerCase().endsWith(".jpg")) {
+                                            contentValues.put(MediaStore.Images.Media.DISPLAY_NAME, name.substring(0, name.length() - 4));
+                                        }
+                                    }
+                                    if (c != null) c.close();
+                                } catch (Exception e) {
+                                    e.printStackTrace();
+                                }
+                            }
                             main_activity.getContentResolver().update(saveUri, contentValues, null, null);
                         }
 

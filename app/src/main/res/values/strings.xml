@@ -741,8 +741,8 @@
     <string name="preference_image_format_png">PNG</string>
     <string name="preference_image_format_jxl_fast">JPEG XL (Fast)</string>
     <string name="preference_image_format_jxl_high_comp">JPEG XL (High compression)</string>
-    <string name="preference_image_format_avif_fast">AVIF (Fast)</string>
-    <string name="preference_image_format_avif_high_comp">AVIF (High compression)</string>
+    <string name="preference_image_format_avif">AVIF</string>
+    <string name="preference_image_format_heic">HEIC</string>
 
     <!-- beware of these strings for preference_nr_mode* being too long, otherwise too wide for popup menu -->
     <string name="preference_nr_mode">NR Mode</string>
