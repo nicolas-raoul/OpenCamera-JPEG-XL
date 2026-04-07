@@ -57,7 +57,9 @@ dependencies {
 
     // JXL
     implementation 'io.github.awxkee:jxl-coder:2.2.0'
-    // HEIF/AVIF
+    // AVIF fallback
+    implementation 'com.github.awxkee:avif-coder:1.5.8'
+    // HEIF/AVIF native
     implementation 'androidx.heifwriter:heifwriter:1.2.0-alpha01'
 
     // newer AndroidJUnit4 InstrumentedTest

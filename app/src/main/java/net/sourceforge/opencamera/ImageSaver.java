@@ -51,6 +51,7 @@ import com.awxkee.jxlcoder.JxlChannelsConfiguration;
 import com.awxkee.jxlcoder.JxlCompressionOption;
 import com.awxkee.jxlcoder.JxlEffort;
 import com.awxkee.jxlcoder.JxlDecodingSpeed;
+import com.radzivon.bartoshyk.avif.coder.HeifCoder;
 
 import android.media.MediaCodec;
 import android.media.MediaCodecInfo;
@@ -3208,7 +3209,7 @@ public class ImageSaver extends Thread {
                 Log.d(TAG, "saveUri: " + saveUri);
 
             if( picFile != null || saveUri != null ) {
-                boolean use_heif_writer = request.image_format == Request.ImageFormat.AVIF || request.image_format == Request.ImageFormat.HEIC;
+                boolean use_heif_writer = request.image_format == Request.ImageFormat.HEIC;
                 OutputStream outputStream = null;
                 
                 try {
@@ -3228,38 +3229,50 @@ public class ImageSaver extends Thread {
                             byte[] jxlBytes = JxlCoder.INSTANCE.encode(bitmap, JxlChannelsConfiguration.RGB, JxlCompressionOption.LOSSY, effort, request.image_quality, speed);
                             outputStream.write(jxlBytes);
                         }
-                        else if( use_heif_writer ) {
+                        else if( request.image_format == Request.ImageFormat.AVIF ) {
+                            byte[] avifBytes = new HeifCoder().encodeAvif(bitmap, request.image_quality);
+                            outputStream.write(avifBytes);
+                        }
+                        else if( request.image_format == Request.ImageFormat.HEIC ) {
+                            byte[] exifBytes = null;
+                            if (data != null) {
+                                java.io.File tempPicFile = null;
+                                try {
+                                    tempPicFile = java.io.File.createTempFile("temp_exif", ".jpg", main_activity.getCacheDir());
+                                    try (java.io.FileOutputStream fos = new java.io.FileOutputStream(tempPicFile)) {
+                                        fos.write(data);
+                                    }
+                                    updateExif(request, tempPicFile, null);
+                                    exifBytes = getExifBytesFromJpeg(tempPicFile);
+                                } catch (Exception e) {
+                                    e.printStackTrace();
+                                } finally {
+                                    if (tempPicFile != null) {
+                                        tempPicFile.delete();
+                                    }
+                                }
+                            }
                             try {
                                 if (picFile != null) {
-                                    if (request.image_format == Request.ImageFormat.AVIF) {
-                                        androidx.heifwriter.AvifWriter heifWriter = new androidx.heifwriter.AvifWriter.Builder(picFile.getAbsolutePath(), bitmap.getWidth(), bitmap.getHeight(), androidx.heifwriter.AvifWriter.INPUT_MODE_BITMAP).setQuality(request.image_quality).build();
-                                        heifWriter.start();
-                                        heifWriter.addBitmap(bitmap);
-                                        heifWriter.stop(3000);
-                                        heifWriter.close();
-                                    } else {
-                                        androidx.heifwriter.HeifWriter heifWriter = new androidx.heifwriter.HeifWriter.Builder(picFile.getAbsolutePath(), bitmap.getWidth(), bitmap.getHeight(), androidx.heifwriter.HeifWriter.INPUT_MODE_BITMAP).setQuality(request.image_quality).build();
-                                        heifWriter.start();
-                                        heifWriter.addBitmap(bitmap);
-                                        heifWriter.stop(3000);
-                                        heifWriter.close();
+                                    androidx.heifwriter.HeifWriter heifWriter = new androidx.heifwriter.HeifWriter.Builder(picFile.getAbsolutePath(), bitmap.getWidth(), bitmap.getHeight(), androidx.heifwriter.HeifWriter.INPUT_MODE_BITMAP).setQuality(request.image_quality).build();
+                                    heifWriter.start();
+                                    heifWriter.addBitmap(bitmap);
+                                    if (exifBytes != null) {
+                                        heifWriter.addExifData(0, exifBytes, 0, exifBytes.length);
                                     }
+                                    heifWriter.stop(0);
+                                    heifWriter.close();
                                 } else if (saveUri != null) {
                                     android.os.ParcelFileDescriptor pfd = main_activity.getContentResolver().openFileDescriptor(saveUri, "rw");
                                     try {
-                                        if (request.image_format == Request.ImageFormat.AVIF) {
-                                            androidx.heifwriter.AvifWriter heifWriter = new androidx.heifwriter.AvifWriter.Builder(pfd.getFileDescriptor(), bitmap.getWidth(), bitmap.getHeight(), androidx.heifwriter.AvifWriter.INPUT_MODE_BITMAP).setQuality(request.image_quality).build();
-                                            heifWriter.start();
-                                            heifWriter.addBitmap(bitmap);
-                                            heifWriter.stop(3000);
-                                            heifWriter.close();
-                                        } else {
-                                            androidx.heifwriter.HeifWriter heifWriter = new androidx.heifwriter.HeifWriter.Builder(pfd.getFileDescriptor(), bitmap.getWidth(), bitmap.getHeight(), androidx.heifwriter.HeifWriter.INPUT_MODE_BITMAP).setQuality(request.image_quality).build();
-                                            heifWriter.start();
-                                            heifWriter.addBitmap(bitmap);
-                                            heifWriter.stop(3000);
-                                            heifWriter.close();
+                                        androidx.heifwriter.HeifWriter heifWriter = new androidx.heifwriter.HeifWriter.Builder(pfd.getFileDescriptor(), bitmap.getWidth(), bitmap.getHeight(), androidx.heifwriter.HeifWriter.INPUT_MODE_BITMAP).setQuality(request.image_quality).build();
+                                        heifWriter.start();
+                                        heifWriter.addBitmap(bitmap);
+                                        if (exifBytes != null) {
+                                            heifWriter.addExifData(0, exifBytes, 0, exifBytes.length);
                                         }
+                                        heifWriter.stop(0);
+                                        heifWriter.close();
                                     } finally {
                                         pfd.close();
                                     }
@@ -3294,7 +3307,10 @@ public class ImageSaver extends Thread {
                     success = true;
                 }
 
-                if( request.image_format == Request.ImageFormat.STD ) {
+                if( request.image_format == Request.ImageFormat.STD ||
+                    request.image_format == Request.ImageFormat.JXL_FAST ||
+                    request.image_format == Request.ImageFormat.JXL_HIGH_COMPRESSION ||
+                    request.image_format == Request.ImageFormat.AVIF ) {
                     // handle transferring/setting Exif tags (JPEG format only)
                     if( bitmap != null ) {
                         // need to update EXIF data! (only supported for JPEG image formats)
@@ -3519,6 +3535,43 @@ public class ImageSaver extends Thread {
             Log.d(TAG, "Save single image performance: total time: " + (System.currentTimeMillis() - time_s));
         }
         return success;
+    }
+
+    private byte[] getExifBytesFromJpeg(java.io.File jpegFile) {
+        try (java.io.FileInputStream fis = new java.io.FileInputStream(jpegFile)) {
+            java.io.ByteArrayOutputStream baos = new java.io.ByteArrayOutputStream();
+            byte[] buf = new byte[4096];
+            int n;
+            while ((n = fis.read(buf)) > 0) {
+                baos.write(buf, 0, n);
+            }
+            byte[] jpegData = baos.toByteArray();
+            
+            int i = 0;
+            if (jpegData.length >= 2 && (jpegData[i] & 0xFF) == 0xFF && (jpegData[i+1] & 0xFF) == 0xD8) {
+                i += 2;
+                while (i + 3 < jpegData.length) {
+                    if ((jpegData[i] & 0xFF) == 0xFF) {
+                        int marker = jpegData[i+1] & 0xFF;
+                        int len = ((jpegData[i+2] & 0xFF) << 8) | (jpegData[i+3] & 0xFF);
+                        if (marker == 0xE1) {
+                            if (i + 4 + 5 < jpegData.length &&
+                                jpegData[i+4] == 'E' && jpegData[i+5] == 'x' && jpegData[i+6] == 'i' && jpegData[i+7] == 'f' && jpegData[i+8] == 0 && jpegData[i+9] == 0) {
+                                byte[] exifBytes = new byte[len - 2];
+                                System.arraycopy(jpegData, i + 4, exifBytes, 0, len - 2);
+                                return exifBytes;
+                            }
+                        }
+                        i += len + 2;
+                    } else {
+                        break;
+                    }
+                }
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+        return null;
     }
 
     /** As setExifFromFile, but can read the Exif tags directly from the jpeg data rather than a file.
