@@ -15,7 +15,7 @@ This version diverges from the upstream OpenCamera repository by adding capabili
     *   `io.github.awxkee:jxl-coder` for JPEG XL encoding.
     *   `com.github.awxkee:avif-coder` as a software fallback for AVIF encoding.
     *   `androidx.heifwriter:heifwriter` for native HEIC (and hardware-accelerated AVIF) encoding.
-2.  **Manifest:** Updated `AndroidManifest.xml` to include `android:extractNativeLibs="true"`, which is required for the native C++ components of the new encoders to function correctly on newer Android versions.
+2.  **Manifest:** Removed `android:extractNativeLibs="true"` from `AndroidManifest.xml`. By default in AGP 8.3+, native libraries are packaged uncompressed and natively 16KB aligned, which fixes 16KB alignment issues on newer Android 15 devices while still allowing the C++ encoders to function correctly.
 3.  **Image Saver (`ImageSaver.java`):** Completely overhauled the image saving pipeline to intercept the camera's raw byte output, decode it into a `Bitmap`, and re-encode it using the selected modern format (JxlCoder, HeifCoder, or HeifWriter) before writing it to storage.
 4.  **Storage Utilities (`StorageUtils.java`):** Registered the new MIME types (`image/jxl`, `image/avif`, `image/heic`) to ensure proper integration with the Android MediaStore and gallery applications.
 
@@ -31,11 +31,9 @@ In standard OpenCamera operation (JPEG), EXIF data is managed via Android's `and
 HEIC successfully preserves all EXIF data, including GPS location. 
 **Implementation:** OpenCamera intercepts the original JPEG EXIF bytes from the camera hardware. It writes these bytes to a temporary `.jpg` file, modifies them using the standard `ExifInterface` (to add GPS, etc.), reads the modified bytes back, and explicitly injects them into the HEIC container using `androidx.heifwriter.HeifWriter.addExifData()`.
 
-### 2. JPEG XL (JXL) - EXIF Lost ❌
-Images saved in JXL (both Fast and High Compression variants) currently lose all EXIF metadata.
-**Technical Details:**
-*   The `io.github.awxkee:jxl-coder` library encodes images directly from an Android `Bitmap` object. It currently does not expose an API parameter to accept or inject raw EXIF byte arrays during the encoding process.
-*   We cannot use OpenCamera's post-processing `updateExif()` method because Android's `ExifInterface.saveAttributes()` strictly validates the file type. If invoked on a `.jxl` file, it throws an `IOException` with the message: *"ExifInterface only supports saving attributes for JPEG, PNG, and WebP formats."*
+### 2. JPEG XL (JXL) - Fully Supported ✅
+Images saved in JXL (both Fast and High Compression variants) successfully preserve all EXIF metadata, including GPS location.
+**Implementation:** The `io.github.awxkee:jxl-coder` library encodes a raw JXL codestream directly from an Android `Bitmap`. To preserve metadata, OpenCamera creates a temporary `.jpg` file, modifies it using `ExifInterface` (ensuring GPS location is added), and extracts the raw TIFF EXIF payload. It then manually constructs an ISO Base Media File Format (BMFF) container, wrapping both the extracted EXIF payload and the JXL codestream into a fully compliant `.jxl` file.
 
 ### 3. AVIF - EXIF Lost ❌
 Images saved in AVIF format currently lose all EXIF metadata on most devices.
