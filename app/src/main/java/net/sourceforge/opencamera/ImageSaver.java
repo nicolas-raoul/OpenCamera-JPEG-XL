@@ -3229,12 +3229,45 @@ public class ImageSaver extends Thread {
                                 if( MyDebug.LOG )
                                     Log.d(TAG, "encode JXL with effort " + effort + " speed " + speed + " bitmap: " + bitmap.getWidth() + "x" + bitmap.getHeight() + " config " + bitmap.getConfig());
                                 try {
+                                    byte[] exifBytes = null;
+                                    java.io.File tempPicFile = null;
+                                    try {
+                                        tempPicFile = java.io.File.createTempFile("temp_exif", ".jpg", main_activity.getCacheDir());
+                                        if (data != null) {
+                                            try (java.io.FileOutputStream fos = new java.io.FileOutputStream(tempPicFile)) {
+                                                fos.write(data);
+                                            }
+                                        } else {
+                                            try (java.io.FileOutputStream fos = new java.io.FileOutputStream(tempPicFile)) {
+                                                bitmap.compress(android.graphics.Bitmap.CompressFormat.JPEG, request.image_quality, fos);
+                                            }
+                                        }
+                                        updateExif(request, tempPicFile, null);
+                                        exifBytes = getExifBytesFromJpeg(tempPicFile);
+                                        if (exifBytes == null) {
+                                            Log.e(TAG, "getExifBytesFromJpeg returned null");
+                                        } else {
+                                            Log.d(TAG, "getExifBytesFromJpeg returned " + exifBytes.length + " bytes");
+                                        }
+                                    } catch (Exception e) {
+                                        e.printStackTrace();
+                                    } finally {
+                                        if (tempPicFile != null) {
+                                            tempPicFile.delete();
+                                        }
+                                    }
                                     byte[] jxlBytes = JxlCoder.INSTANCE.encode(bitmap, JxlChannelsConfiguration.RGBA, JxlCompressionOption.LOSSY, effort, request.image_quality, speed);
                                     if( jxlBytes == null ) {
                                         Log.e(TAG, "JxlCoder.encode returned null");
                                         throw new IOException();
                                     }
-                                    outputStream.write(jxlBytes);
+                                    byte[] wrappedJxl = wrapJxlWithExif(jxlBytes, exifBytes);
+                                    if (wrappedJxl == jxlBytes) {
+                                        Log.e(TAG, "wrapJxlWithExif failed to wrap the codestream");
+                                    } else {
+                                        Log.d(TAG, "wrapJxlWithExif successfully wrapped the codestream");
+                                    }
+                                    outputStream.write(wrappedJxl);
                                 }
                                 catch(Exception e) {
                                     Log.e(TAG, "failed to encode JXL");
@@ -3614,6 +3647,40 @@ public class ImageSaver extends Thread {
             e.printStackTrace();
         }
         return null;
+    }
+
+    private byte[] wrapJxlWithExif(byte[] jxlCodestream, byte[] exifFromJpeg) {
+        if (exifFromJpeg == null || exifFromJpeg.length < 6 || jxlCodestream == null || jxlCodestream.length < 2) {
+            return jxlCodestream;
+        }
+        if (jxlCodestream[0] == 0x00 && jxlCodestream[1] == 0x00 && jxlCodestream[2] == 0x00 && jxlCodestream[3] == 0x0C) {
+            return jxlCodestream;
+        }
+        int tiffLength = exifFromJpeg.length - 6;
+        int exifBoxSize = 8 + 4 + tiffLength;
+        int jxlcBoxSize = 8 + jxlCodestream.length;
+        int ftypBoxSize = 20;
+        int totalSize = 12 + ftypBoxSize + exifBoxSize + jxlcBoxSize;
+        java.io.ByteArrayOutputStream baos = new java.io.ByteArrayOutputStream(totalSize);
+        try {
+            baos.write(new byte[]{0x00, 0x00, 0x00, 0x0C, 0x4A, 0x58, 0x4C, 0x20, 0x0D, 0x0A, (byte)0x87, 0x0A});
+            baos.write(new byte[]{0x00, 0x00, 0x00, 0x14}); // ftyp size (20)
+            baos.write(new byte[]{'f', 't', 'y', 'p'});
+            baos.write(new byte[]{'j', 'x', 'l', ' '}); // major brand
+            baos.write(new byte[]{0x00, 0x00, 0x00, 0x00}); // minor version
+            baos.write(new byte[]{'j', 'x', 'l', ' '}); // compatible brands
+            baos.write(new byte[]{(byte)((exifBoxSize >> 24) & 0xFF), (byte)((exifBoxSize >> 16) & 0xFF), (byte)((exifBoxSize >> 8) & 0xFF), (byte)(exifBoxSize & 0xFF)});
+            baos.write(new byte[]{'E', 'x', 'i', 'f'});
+            baos.write(new byte[]{0x00, 0x00, 0x00, 0x00});
+            baos.write(exifFromJpeg, 6, tiffLength);
+            baos.write(new byte[]{(byte)((jxlcBoxSize >> 24) & 0xFF), (byte)((jxlcBoxSize >> 16) & 0xFF), (byte)((jxlcBoxSize >> 8) & 0xFF), (byte)(jxlcBoxSize & 0xFF)});
+            baos.write(new byte[]{'j', 'x', 'l', 'c'});
+            baos.write(jxlCodestream);
+            return baos.toByteArray();
+        } catch (Exception e) {
+            e.printStackTrace();
+            return jxlCodestream;
+        }
     }
 
     /** As setExifFromFile, but can read the Exif tags directly from the jpeg data rather than a file.
