@@ -3209,63 +3209,76 @@ public class ImageSaver extends Thread {
                 Log.d(TAG, "saveUri: " + saveUri);
 
             if( picFile != null || saveUri != null ) {
-                boolean use_heif_writer = request.image_format == Request.ImageFormat.HEIC;
-                OutputStream outputStream = null;
-                
-                try {
-                    if (!use_heif_writer) {
-                        if( picFile != null )
-                            outputStream = new FileOutputStream(picFile);
-                        else
-                            outputStream = main_activity.getContentResolver().openOutputStream(saveUri);
-                    }
-                    
-                    if( bitmap != null ) {
-                        if( MyDebug.LOG )
-                            Log.d(TAG, "compress bitmap, quality " + request.image_quality);
-                        if( request.image_format == Request.ImageFormat.JXL_FAST || request.image_format == Request.ImageFormat.JXL_HIGH_COMPRESSION ) {
-                            JxlEffort effort = request.image_format == Request.ImageFormat.JXL_FAST ? JxlEffort.FALCON : JxlEffort.TORTOISE;
-                            JxlDecodingSpeed speed = request.image_format == Request.ImageFormat.JXL_FAST ? JxlDecodingSpeed.FAST : JxlDecodingSpeed.SLOWEST;
-                            byte[] jxlBytes = JxlCoder.INSTANCE.encode(bitmap, JxlChannelsConfiguration.RGB, JxlCompressionOption.LOSSY, effort, request.image_quality, speed);
-                            outputStream.write(jxlBytes);
+                    boolean use_heif_writer = request.image_format == Request.ImageFormat.HEIC;
+                    OutputStream outputStream = null;
+
+                    try {
+                        if (!use_heif_writer) {
+                            if( picFile != null )
+                                outputStream = new FileOutputStream(picFile);
+                            else
+                                outputStream = main_activity.getContentResolver().openOutputStream(saveUri);
                         }
-                        else if( request.image_format == Request.ImageFormat.AVIF ) {
-                            byte[] avifBytes = new HeifCoder().encodeAvif(bitmap, request.image_quality);
-                            outputStream.write(avifBytes);
-                        }
-                        else if( request.image_format == Request.ImageFormat.HEIC ) {
-                            byte[] exifBytes = null;
-                            if (data != null) {
-                                java.io.File tempPicFile = null;
+
+                        if( bitmap != null ) {
+                            if( MyDebug.LOG )
+                                Log.d(TAG, "compress bitmap, quality " + request.image_quality + " format " + request.image_format);
+                            if( request.image_format == Request.ImageFormat.JXL_FAST || request.image_format == Request.ImageFormat.JXL_HIGH_COMPRESSION ) {
+                                JxlEffort effort = request.image_format == Request.ImageFormat.JXL_FAST ? JxlEffort.FALCON : JxlEffort.TORTOISE;
+                                JxlDecodingSpeed speed = request.image_format == Request.ImageFormat.JXL_FAST ? JxlDecodingSpeed.FAST : JxlDecodingSpeed.SLOWEST;
+                                if( MyDebug.LOG )
+                                    Log.d(TAG, "encode JXL with effort " + effort + " speed " + speed + " bitmap: " + bitmap.getWidth() + "x" + bitmap.getHeight() + " config " + bitmap.getConfig());
                                 try {
-                                    tempPicFile = java.io.File.createTempFile("temp_exif", ".jpg", main_activity.getCacheDir());
-                                    try (java.io.FileOutputStream fos = new java.io.FileOutputStream(tempPicFile)) {
-                                        fos.write(data);
+                                    byte[] jxlBytes = JxlCoder.INSTANCE.encode(bitmap, JxlChannelsConfiguration.RGBA, JxlCompressionOption.LOSSY, effort, request.image_quality, speed);
+                                    if( jxlBytes == null ) {
+                                        Log.e(TAG, "JxlCoder.encode returned null");
+                                        throw new IOException();
                                     }
-                                    updateExif(request, tempPicFile, null);
-                                    exifBytes = getExifBytesFromJpeg(tempPicFile);
-                                } catch (Exception e) {
-                                    e.printStackTrace();
-                                } finally {
-                                    if (tempPicFile != null) {
-                                        tempPicFile.delete();
-                                    }
+                                    outputStream.write(jxlBytes);
+                                }
+                                catch(Exception e) {
+                                    Log.e(TAG, "failed to encode JXL");
+                                    MyDebug.logStackTrace(TAG, "failed to encode JXL", e);
+                                    throw new IOException();
                                 }
                             }
-                            try {
-                                if (picFile != null) {
-                                    androidx.heifwriter.HeifWriter heifWriter = new androidx.heifwriter.HeifWriter.Builder(picFile.getAbsolutePath(), bitmap.getWidth(), bitmap.getHeight(), androidx.heifwriter.HeifWriter.INPUT_MODE_BITMAP).setQuality(request.image_quality).build();
-                                    heifWriter.start();
-                                    heifWriter.addBitmap(bitmap);
-                                    if (exifBytes != null) {
-                                        heifWriter.addExifData(0, exifBytes, 0, exifBytes.length);
+                            else if( request.image_format == Request.ImageFormat.AVIF ) {
+                                try {
+                                    byte[] avifBytes = new HeifCoder().encodeAvif(bitmap, request.image_quality);
+                                    if( avifBytes == null ) {
+                                        Log.e(TAG, "HeifCoder.encodeAvif returned null");
+                                        throw new IOException();
                                     }
-                                    heifWriter.stop(0);
-                                    heifWriter.close();
-                                } else if (saveUri != null) {
-                                    android.os.ParcelFileDescriptor pfd = main_activity.getContentResolver().openFileDescriptor(saveUri, "rw");
+                                    outputStream.write(avifBytes);
+                                }
+                                catch(Exception e) {
+                                    Log.e(TAG, "failed to encode AVIF");
+                                    MyDebug.logStackTrace(TAG, "failed to encode AVIF", e);
+                                    throw new IOException();
+                                }
+                            }
+                            else if( request.image_format == Request.ImageFormat.HEIC ) {
+                                byte[] exifBytes = null;
+                                if (data != null) {
+                                    java.io.File tempPicFile = null;
                                     try {
-                                        androidx.heifwriter.HeifWriter heifWriter = new androidx.heifwriter.HeifWriter.Builder(pfd.getFileDescriptor(), bitmap.getWidth(), bitmap.getHeight(), androidx.heifwriter.HeifWriter.INPUT_MODE_BITMAP).setQuality(request.image_quality).build();
+                                        tempPicFile = java.io.File.createTempFile("temp_exif", ".jpg", main_activity.getCacheDir());
+                                        try (java.io.FileOutputStream fos = new java.io.FileOutputStream(tempPicFile)) {
+                                            fos.write(data);
+                                        }
+                                        updateExif(request, tempPicFile, null);
+                                        exifBytes = getExifBytesFromJpeg(tempPicFile);
+                                    } catch (Exception e) {
+                                        e.printStackTrace();
+                                    } finally {
+                                        if (tempPicFile != null) {
+                                            tempPicFile.delete();
+                                        }
+                                    }
+                                }
+                                try {
+                                    if (picFile != null) {
+                                        androidx.heifwriter.HeifWriter heifWriter = new androidx.heifwriter.HeifWriter.Builder(picFile.getAbsolutePath(), bitmap.getWidth(), bitmap.getHeight(), androidx.heifwriter.HeifWriter.INPUT_MODE_BITMAP).setQuality(request.image_quality).build();
                                         heifWriter.start();
                                         heifWriter.addBitmap(bitmap);
                                         if (exifBytes != null) {
@@ -3273,30 +3286,42 @@ public class ImageSaver extends Thread {
                                         }
                                         heifWriter.stop(0);
                                         heifWriter.close();
-                                    } finally {
-                                        pfd.close();
+                                    } else if (saveUri != null) {
+                                        android.os.ParcelFileDescriptor pfd = main_activity.getContentResolver().openFileDescriptor(saveUri, "rw");
+                                        try {
+                                            androidx.heifwriter.HeifWriter heifWriter = new androidx.heifwriter.HeifWriter.Builder(pfd.getFileDescriptor(), bitmap.getWidth(), bitmap.getHeight(), androidx.heifwriter.HeifWriter.INPUT_MODE_BITMAP).setQuality(request.image_quality).build();
+                                            heifWriter.start();
+                                            heifWriter.addBitmap(bitmap);
+                                            if (exifBytes != null) {
+                                                heifWriter.addExifData(0, exifBytes, 0, exifBytes.length);
+                                            }
+                                            heifWriter.stop(0);
+                                            heifWriter.close();
+                                        } finally {
+                                            pfd.close();
+                                        }
                                     }
+                                } catch (Exception e) {
+                                    e.printStackTrace();
+                                    throw new IOException();
                                 }
-                            } catch (Exception e) {
-                                e.printStackTrace();
+                            }
+                            else {
+                                Bitmap.CompressFormat compress_format = getBitmapCompressFormat(request.image_format);
+                                bitmap.compress(compress_format, request.image_quality, outputStream);
                             }
                         }
                         else {
-                            Bitmap.CompressFormat compress_format = getBitmapCompressFormat(request.image_format);
-                            bitmap.compress(compress_format, request.image_quality, outputStream);
+                            if (outputStream != null) {
+                                outputStream.write(data);
+                            }
                         }
                     }
-                    else {
+                    finally {
                         if (outputStream != null) {
-                            outputStream.write(data);
+                            outputStream.close();
                         }
                     }
-                }
-                finally {
-                    if (outputStream != null) {
-                        outputStream.close();
-                    }
-                }
                 if( MyDebug.LOG )
                     Log.d(TAG, "saveImageNow saved photo");
                 if( MyDebug.LOG ) {
@@ -3307,39 +3332,50 @@ public class ImageSaver extends Thread {
                     success = true;
                 }
 
-                if( request.image_format == Request.ImageFormat.STD ||
-                    request.image_format == Request.ImageFormat.JXL_FAST ||
-                    request.image_format == Request.ImageFormat.JXL_HIGH_COMPRESSION ||
-                    request.image_format == Request.ImageFormat.AVIF ) {
+                if( request.image_format == Request.ImageFormat.STD ) {
                     // handle transferring/setting Exif tags (JPEG format only)
+                    if( MyDebug.LOG )
+                        Log.d(TAG, "handle EXIF for format: " + request.image_format);
                     if( bitmap != null ) {
                         // need to update EXIF data! (only supported for JPEG image formats)
                         if( MyDebug.LOG )
                             Log.d(TAG, "set Exif tags from data");
-                        if( picFile != null ) {
-                            setExifFromData(request, data, picFile);
+                        try {
+                            if( picFile != null ) {
+                                if( MyDebug.LOG )
+                                    Log.d(TAG, "setExifFromData to picFile: " + picFile.getAbsolutePath());
+                                setExifFromData(request, data, picFile);
+                            }
+                            else {
+                                if( MyDebug.LOG )
+                                    Log.d(TAG, "setExifFromData to saveUri: " + saveUri);
+                                ParcelFileDescriptor parcelFileDescriptor = main_activity.getContentResolver().openFileDescriptor(saveUri, "rw");
+                                try {
+                                    if( parcelFileDescriptor != null ) {
+                                        FileDescriptor fileDescriptor = parcelFileDescriptor.getFileDescriptor();
+                                        setExifFromData(request, data, fileDescriptor);
+                                    }
+                                    else {
+                                        Log.e(TAG, "failed to create ParcelFileDescriptor for saveUri: " + saveUri);
+                                    }
+                                }
+                                finally {
+                                    if( parcelFileDescriptor != null ) {
+                                        try {
+                                            parcelFileDescriptor.close();
+                                        }
+                                        catch(IOException e) {
+                                            MyDebug.logStackTrace(TAG, "fail to close parcelFileDescriptor", e);
+                                        }
+                                    }
+                                }
+                            }
                         }
-                        else {
-                            ParcelFileDescriptor parcelFileDescriptor = main_activity.getContentResolver().openFileDescriptor(saveUri, "rw");
-                            try {
-                                if( parcelFileDescriptor != null ) {
-                                    FileDescriptor fileDescriptor = parcelFileDescriptor.getFileDescriptor();
-                                    setExifFromData(request, data, fileDescriptor);
-                                }
-                                else {
-                                    Log.e(TAG, "failed to create ParcelFileDescriptor for saveUri: " + saveUri);
-                                }
-                            }
-                            finally {
-                                if( parcelFileDescriptor != null ) {
-                                    try {
-                                        parcelFileDescriptor.close();
-                                    }
-                                    catch(IOException e) {
-                                        MyDebug.logStackTrace(TAG, "fail to close parcelFileDescriptor", e);
-                                    }
-                                }
-                            }
+                        catch(Exception e) {
+                            Log.e(TAG, "failed to set EXIF data");
+                            e.printStackTrace(); // Log to System.err/logcat
+                            MyDebug.logStackTrace(TAG, "failed to set EXIF data", e);
+                            // we don't throw IOException here, as we'd still rather save the image without EXIF than not at all
                         }
                     }
                     else {
@@ -3423,17 +3459,23 @@ public class ImageSaver extends Thread {
             }
         }
         catch(FileNotFoundException e) {
+            Log.e(TAG, "FileNotFoundException in saveImageNow");
             MyDebug.logStackTrace(TAG, "file not found", e);
             main_activity.getPreview().showToast(null, R.string.failed_to_save_photo);
         }
         catch(IOException e) {
+            Log.e(TAG, "IOException in saveImageNow");
             MyDebug.logStackTrace(TAG, "I/O error writing file", e);
             main_activity.getPreview().showToast(null, R.string.failed_to_save_photo);
         }
         catch(SecurityException e) {
-            // received security exception from copyFileToUri()->openOutputStream() from Google Play
-            // update: no longer have copyFileToUri() (as no longer use temporary files for SAF), but might as well keep this
+            Log.e(TAG, "SecurityException in saveImageNow");
             MyDebug.logStackTrace(TAG, "security exception writing file", e);
+            main_activity.getPreview().showToast(null, R.string.failed_to_save_photo);
+        }
+        catch(Exception e) {
+            Log.e(TAG, "Generic Exception in saveImageNow");
+            MyDebug.logStackTrace(TAG, "generic exception writing file", e);
             main_activity.getPreview().showToast(null, R.string.failed_to_save_photo);
         }
 
