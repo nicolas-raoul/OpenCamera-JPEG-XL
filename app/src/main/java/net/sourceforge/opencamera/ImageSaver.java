@@ -3621,6 +3621,7 @@ public class ImageSaver extends Thread {
                 baos.write(buf, 0, n);
             }
             byte[] jpegData = baos.toByteArray();
+            Log.d(TAG, "getExifBytesFromJpeg: read " + jpegData.length + " bytes from jpeg");
             
             int i = 0;
             if (jpegData.length >= 2 && (jpegData[i] & 0xFF) == 0xFF && (jpegData[i+1] & 0xFF) == 0xD8) {
@@ -3629,23 +3630,31 @@ public class ImageSaver extends Thread {
                     if ((jpegData[i] & 0xFF) == 0xFF) {
                         int marker = jpegData[i+1] & 0xFF;
                         int len = ((jpegData[i+2] & 0xFF) << 8) | (jpegData[i+3] & 0xFF);
+                        Log.d(TAG, "getExifBytesFromJpeg: found marker " + Integer.toHexString(marker) + " len " + len);
                         if (marker == 0xE1) {
                             if (i + 4 + 5 < jpegData.length &&
                                 jpegData[i+4] == 'E' && jpegData[i+5] == 'x' && jpegData[i+6] == 'i' && jpegData[i+7] == 'f' && jpegData[i+8] == 0 && jpegData[i+9] == 0) {
                                 byte[] exifBytes = new byte[len - 2];
                                 System.arraycopy(jpegData, i + 4, exifBytes, 0, len - 2);
+                                Log.d(TAG, "getExifBytesFromJpeg: successfully extracted " + exifBytes.length + " bytes");
                                 return exifBytes;
+                            } else {
+                                Log.d(TAG, "getExifBytesFromJpeg: E1 marker but no Exif header");
                             }
                         }
                         i += len + 2;
                     } else {
+                        Log.d(TAG, "getExifBytesFromJpeg: expected FF but got " + Integer.toHexString(jpegData[i] & 0xFF));
                         break;
                     }
                 }
+            } else {
+                Log.d(TAG, "getExifBytesFromJpeg: not a valid JPEG header");
             }
         } catch (Exception e) {
             e.printStackTrace();
         }
+        Log.e(TAG, "getExifBytesFromJpeg: failed to find EXIF data");
         return null;
     }
 
@@ -4636,7 +4645,7 @@ public class ImageSaver extends Thread {
     private void updateExif(Request request, File picFile, Uri saveUri) throws IOException {
         if( MyDebug.LOG )
             Log.d(TAG, "updateExif: " + picFile);
-        if( request.store_geo_direction || request.store_ypr || hasCustomExif(request.custom_tag_artist, request.custom_tag_copyright) ||
+        if( request.store_location || request.store_geo_direction || request.store_ypr || hasCustomExif(request.custom_tag_artist, request.custom_tag_copyright) ||
                 request.using_camera_extensions || // when using camera extensions, we need to call modifyExif() to fix up various missing tags
                 needGPSExifFix(request.type == Request.Type.JPEG, request.using_camera2, request.store_location) ) {
             long time_s = System.currentTimeMillis();

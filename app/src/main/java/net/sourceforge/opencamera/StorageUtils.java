@@ -853,7 +853,7 @@ public class StorageUtils {
                 mimeType = "image/png";
                 break;
             case "jxl":
-                mimeType = "image/jpeg";
+                mimeType = "image/jxl";
                 break;
             case "avif":
                 mimeType = "image/avif";
