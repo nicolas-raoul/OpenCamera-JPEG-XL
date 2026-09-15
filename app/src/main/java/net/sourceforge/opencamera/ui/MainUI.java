@@ -62,7 +62,8 @@ public class MainUI {
     enum UIPlacement {
         UIPLACEMENT_RIGHT,
         UIPLACEMENT_LEFT,
-        UIPLACEMENT_TOP
+        UIPLACEMENT_TOP,
+        UIPLACEMENT_BOTTOM
     }
     private UIPlacement ui_placement = UIPlacement.UIPLACEMENT_RIGHT;
     private View top_icon = null;
@@ -199,6 +200,8 @@ public class MainUI {
                 return UIPlacement.UIPLACEMENT_LEFT;
             case "ui_top":
                 return UIPlacement.UIPLACEMENT_TOP;
+            case "ui_bottom":
+                return UIPlacement.UIPLACEMENT_BOTTOM;
             default:
                 return UIPlacement.UIPLACEMENT_RIGHT;
         }
@@ -225,6 +228,10 @@ public class MainUI {
 
         // we cache the preference_ui_placement to save having to check it in the draw() method
         this.ui_placement = computeUIPlacement();
+        if (this.ui_placement == UIPlacement.UIPLACEMENT_BOTTOM) {
+            system_orientation_portrait = true;
+            system_orientation_reversed_landscape = false;
+        }
         if( MyDebug.LOG )
             Log.d(TAG, "ui_placement: " + ui_placement);
         int relative_orientation;
@@ -331,7 +338,7 @@ public class MainUI {
             iconpanel_align_parent_top = align_parent_top;
             iconpanel_align_parent_bottom = align_parent_bottom;
         }
-        else if( ui_placement == UIPlacement.UIPLACEMENT_TOP ) {
+        else if( ui_placement == UIPlacement.UIPLACEMENT_TOP || ui_placement == UIPlacement.UIPLACEMENT_BOTTOM ) {
             iconpanel_left_of = below;
             iconpanel_right_of = above;
             iconpanel_above = left_of;
@@ -340,10 +347,17 @@ public class MainUI {
             iconpanel_align_parent_left = align_parent_bottom;
             //noinspection SuspiciousNameCombination
             iconpanel_align_parent_right = align_parent_top;
-            //noinspection SuspiciousNameCombination
-            iconpanel_align_parent_top = align_parent_left;
-            //noinspection SuspiciousNameCombination
-            iconpanel_align_parent_bottom = align_parent_right;
+            if( ui_placement == UIPlacement.UIPLACEMENT_TOP ) {
+                //noinspection SuspiciousNameCombination
+                iconpanel_align_parent_top = align_parent_left;
+                //noinspection SuspiciousNameCombination
+                iconpanel_align_parent_bottom = align_parent_right;
+            } else {
+                //noinspection SuspiciousNameCombination
+                iconpanel_align_parent_top = align_parent_right;
+                //noinspection SuspiciousNameCombination
+                iconpanel_align_parent_bottom = align_parent_left;
+            }
         }
 
         Point display_size = new Point();
@@ -438,8 +452,8 @@ public class MainUI {
             View previous_view = view;
 
             List<View> buttons_permanent = new ArrayList<>();
-            if( ui_placement == UIPlacement.UIPLACEMENT_TOP ) {
-                // not part of the icon panel in TOP mode
+            if( ui_placement == UIPlacement.UIPLACEMENT_TOP || ui_placement == UIPlacement.UIPLACEMENT_BOTTOM ) {
+                // not part of the icon panel in TOP/BOTTOM mode
                 view = main_activity.findViewById(R.id.gallery);
                 layoutParams = (RelativeLayout.LayoutParams) view.getLayoutParams();
                 layoutParams.addRule(align_parent_left, 0);
@@ -496,7 +510,7 @@ public class MainUI {
             }
 
             int button_size = main_activity.getResources().getDimensionPixelSize(R.dimen.onscreen_button_size);
-            if( ui_placement == UIPlacement.UIPLACEMENT_TOP ) {
+            if( ui_placement == UIPlacement.UIPLACEMENT_TOP || ui_placement == UIPlacement.UIPLACEMENT_BOTTOM ) {
                 // need to dynamically lay out the permanent icons
 
                 int count = 0;
@@ -864,7 +878,7 @@ public class MainUI {
         {
             final View view = main_activity.findViewById(R.id.popup_container);
             RelativeLayout.LayoutParams layoutParams = (RelativeLayout.LayoutParams)view.getLayoutParams();
-            if( ui_placement == UIPlacement.UIPLACEMENT_TOP ) {
+            if( ui_placement == UIPlacement.UIPLACEMENT_TOP || ui_placement == UIPlacement.UIPLACEMENT_BOTTOM ) {
                 layoutParams.addRule(align_right, 0);
                 layoutParams.addRule(align_bottom, 0);
                 layoutParams.addRule(align_left, 0);
@@ -923,6 +937,34 @@ public class MainUI {
         if( !popup_container_only ) {
             setTakePhotoIcon();
             // no need to call setSwitchCameraContentDescription()
+
+            int shift_y = 0;
+            if (ui_placement == UIPlacement.UIPLACEMENT_BOTTOM) {
+                shift_y = -main_activity.getResources().getDimensionPixelSize(R.dimen.onscreen_button_size) - (int)(layoutUI_display_h * 0.15f);
+            }
+            View[] viewsToTranslate = new View[] {
+                    main_activity.findViewById(R.id.preview),
+                    main_activity.findViewById(R.id.gallery),
+                    main_activity.findViewById(R.id.take_photo),
+                    main_activity.findViewById(R.id.switch_camera),
+                    main_activity.findViewById(R.id.switch_multi_camera),
+                    main_activity.findViewById(R.id.pause_video),
+                    main_activity.findViewById(R.id.cancel_panorama),
+                    main_activity.findViewById(R.id.switch_video),
+                    main_activity.findViewById(R.id.take_photo_when_video_recording),
+                    main_activity.findViewById(R.id.zoom_seekbar),
+                    main_activity.findViewById(R.id.focus_seekbar),
+                    main_activity.findViewById(R.id.focus_bracketing_target_seekbar)
+            };
+            for(View v : viewsToTranslate) {
+                if( v != null ) {
+                    v.setTranslationY(shift_y);
+                }
+            }
+            View sliders = main_activity.findViewById(R.id.sliders_container);
+            if( sliders != null ) {
+                sliders.setTranslationY(sliders.getTranslationY() + shift_y);
+            }
         }
 
         if( MyDebug.LOG ) {
@@ -1027,7 +1069,7 @@ public class MainUI {
             view.setPivotX(popup_width/2.0f);
             view.setPivotY(popup_height/2.0f);
         }
-        else if( ui_placement == UIPlacement.UIPLACEMENT_TOP ) {
+        else if( ui_placement == UIPlacement.UIPLACEMENT_TOP || ui_placement == UIPlacement.UIPLACEMENT_BOTTOM ) {
             view.setPivotX(0.0f);
             view.setPivotY(0.0f);
             if( ui_rotation == 90 ) {

@@ -1815,7 +1815,7 @@ public class DrawPreview {
             int text_y = (int) (16 * scale_font + 0.5f); // convert dps to pixels
             boolean avoid_ui = false;
             // fine tuning to adjust placement of text with respect to the GUI, depending on orientation
-            if( ui_placement == MainUI.UIPlacement.UIPLACEMENT_TOP && ( device_ui_rotation == 0 || device_ui_rotation == 180 ) ) {
+            if( (ui_placement == MainUI.UIPlacement.UIPLACEMENT_TOP || ui_placement == MainUI.UIPlacement.UIPLACEMENT_BOTTOM) && ( device_ui_rotation == 0 || device_ui_rotation == 180 ) ) {
                 text_base_y = canvas.getHeight() - (int)(0.1*gap_y);
                 if( device_ui_rotation == 0 )
                     avoid_ui = true;

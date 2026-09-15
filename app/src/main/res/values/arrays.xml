@@ -905,11 +905,13 @@
         <item>@string/preference_ui_placement_left</item>
         <item>@string/preference_ui_placement_right</item>
         <item>@string/preference_ui_placement_top</item>
+        <item>@string/preference_ui_placement_bottom</item>
     </string-array>
     <string-array name="preference_ui_placement_values">
         <item>ui_left</item>
         <item>ui_right</item>
         <item>ui_top</item>
+        <item>ui_bottom</item>
     </string-array>
     <string-array name="preference_remote_type_entries">
         <item>@string/preference_remote_type_kraken</item>
