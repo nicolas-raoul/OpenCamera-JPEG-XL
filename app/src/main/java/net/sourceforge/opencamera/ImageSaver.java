@@ -51,7 +51,8 @@ import com.awxkee.jxlcoder.JxlChannelsConfiguration;
 import com.awxkee.jxlcoder.JxlCompressionOption;
 import com.awxkee.jxlcoder.JxlEffort;
 import com.awxkee.jxlcoder.JxlDecodingSpeed;
-import com.radzivon.bartoshyk.avif.coder.HeifCoder;
+import com.radzivon.bartoshyk.avif.coder.AvifEncodingOptions;
+import com.radzivon.bartoshyk.avif.coder.Coder;
 
 import android.media.MediaCodec;
 import android.media.MediaCodecInfo;
@@ -3277,9 +3278,9 @@ public class ImageSaver extends Thread {
                             }
                             else if( request.image_format == Request.ImageFormat.AVIF ) {
                                 try {
-                                    byte[] avifBytes = new HeifCoder().encodeAvif(bitmap, request.image_quality);
+                                    byte[] avifBytes = new Coder().encodeAvif(bitmap, null, new AvifEncodingOptions(request.image_quality));
                                     if( avifBytes == null ) {
-                                        Log.e(TAG, "HeifCoder.encodeAvif returned null");
+                                        Log.e(TAG, "Coder.encodeAvif returned null");
                                         throw new IOException();
                                     }
                                     outputStream.write(avifBytes);

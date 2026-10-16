@@ -1767,7 +1767,7 @@ public class MyApplicationInterface extends BasicApplicationInterface {
 
     @Override
     public boolean getJpegRPref() {
-        if( sharedPreferences.getString(PreferenceKeys.ImageFormatPreferenceKey, "preference_image_format_jpeg").equals("preference_image_format_jpeg_r") ) {
+        if( sharedPreferences.getString(PreferenceKeys.ImageFormatPreferenceKey, "preference_image_format_jxl_fast").equals("preference_image_format_jpeg_r") ) {
             if( main_activity.getPreview().isVideo() ) {
                 // don't support JPEG R, either for video recording or video snapshot - problem that video recording fails
                 // if CameraController2 sets "config.setDynamicRangeProfile(DynamicRangeProfiles.HLG10);" for the preview
@@ -1785,7 +1785,7 @@ public class MyApplicationInterface extends BasicApplicationInterface {
     }
 
     private ImageSaver.Request.ImageFormat getImageFormatPref() {
-        switch( sharedPreferences.getString(PreferenceKeys.ImageFormatPreferenceKey, "preference_image_format_jpeg") ) {
+        switch( sharedPreferences.getString(PreferenceKeys.ImageFormatPreferenceKey, "preference_image_format_jxl_fast") ) {
             case "preference_image_format_webp":
                 return ImageSaver.Request.ImageFormat.WEBP;
             case "preference_image_format_png":

@@ -41,7 +41,7 @@
         android:summary="@string/preference_image_format_summary"
         android:entries="@array/preference_image_format_entries"
         android:entryValues="@array/preference_image_format_values"
-        android:defaultValue="preference_image_format_jpeg"
+        android:defaultValue="preference_image_format_jxl_fast"
         />
 
     <!--  if we move this to another PreferenceGroup, we should update code to remove this Preference -->
